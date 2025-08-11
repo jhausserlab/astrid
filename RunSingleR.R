@@ -24,7 +24,7 @@ if(species == "human"){
   }
 
 }else if (species == "mouse") {
-   newRef <- readRDS("data/ASTRID_SingleR_Reference_mouse_20250805.Rds")
+   newRef <- readRDS("data/ASTRID_SingleR_Reference_mouse_20250811.Rds")
 }else{
   print("Invalid species entered!")
   return(0)
