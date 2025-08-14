@@ -1,5 +1,7 @@
 # ᛅᛋᛏᚱᛁᛏ (ASTRID - Automatized Single-cell Typing for tumoR transcrIptomics Data)
 
+By Alper Eroglu <alper.eroglu at scilifelab.se>, Jean Hausser <jean.hausser at scilifelab.se>
+
 Tool for automatic annotation of cells from scRNA-seq (Single Cell RNA sequencing) and Xenium in situ sequencing datasets. Tailored for samples from tumor. Currently works with AnnData objects from [Scanpy](https://scanpy.readthedocs.io/en/stable/).
 
 ```
