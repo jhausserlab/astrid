@@ -681,9 +681,7 @@ def main():
             if "authorType" not in adata.uns:
                 adata.obs["customAuthorType"]  = "NotAvailable"
                 adata.uns["authorType"] = "customAuthorType"
-            
-            args.author_type = "customAuthorType"
-
+                args.author_type = "customAuthorType"
 
             start_time = time.time()
             adata = astrid_clustering(adata, args.input_prefix, outDir, cutoff_level=args.cutoff_level)
