@@ -151,7 +151,7 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
     
     return adata
 
-def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human", skip_annotation=False):
+def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human", skip_annotation=False, reference_file=None):
 
     from adpbulk import ADPBulk
 
@@ -187,8 +187,13 @@ def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human
 
     else:
         singleR_file = os.path.splitext(output_file)[0] + "_singleR_v2.csv"
-
-        singleR_result = runSingleR(adata_file= os.path.splitext(output_file)[0] + "_" + final_key + "_pseudobulk_matrix.csv", output_file=singleR_file, species=species, rscript_path="/usr/bin/Rscript")
+        singleR_result = runSingleR(
+            adata_file=os.path.splitext(output_file)[0] + "_" + final_key + "_pseudobulk_matrix.csv",
+            output_file=singleR_file,
+            species=species,
+            rscript_path="/usr/bin/Rscript",
+            reference_file=reference_file
+        )
 
         singleR_result = singleR_result.rename(columns={'pruned.labels': 'SingleR_Pruned_CellType', 'labels': 'SingleR_CellType', 'delta.next': 'SingleR_All_deltanext'})
 
@@ -446,6 +451,8 @@ def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clu
     print("Number of cells that passed the formula out of the applicable/total: " + str(tableInterest[tableInterest["FormulaPassed"] == True]["CellCount"].sum()) + "/" + str(tableInterest[tableInterest["FormulaPassed"] != "not applicable"]["CellCount"].sum()) + "/" + str(tableInterest["CellCount"].sum()))
     print("Percentage of cells that passed the formula out of the applicable/total: {:.2f}/{:.2f}".format(tableInterest[tableInterest["FormulaPassed"] == True]["CellCount"].sum() / tableInterest[tableInterest["FormulaPassed"] != "not applicable"]["CellCount"].sum() * 100, tableInterest[tableInterest["FormulaPassed"] == True]["CellCount"].sum() / tableInterest["CellCount"].sum() * 100))
 
+    print("Validation result in: " + output_clustering_results)
+
     return tableInterest
 
 def astrid_damage(adata, tableInterest, pseudobulk_matrix, output_clustering_results, output_file):
@@ -584,6 +591,7 @@ def main():
     parser.add_argument('--author_type', type=str, help='Author cell type column name')
     parser.add_argument('--species', type=str, default="human", help='Species of dataset. (human/mouse)')
     parser.add_argument('--out_dir', type=str, help='Output directory for plots')
+    parser.add_argument('--reference', type=str, default="", help='Optional SingleR reference RDS file path')
 
     args = parser.parse_args()
     
@@ -622,7 +630,7 @@ def main():
         print(f"Clustering took {int(elapsed_time // 60)} minutes and {elapsed_time % 60:.2f} seconds")
         
         start_time = time.time()
-        adata = astrid_annotation(adata, args.output_file, args.input_prefix, outDir, species=args.species, skip_annotation=args.skip_cell_typing)
+        adata = astrid_annotation(adata, args.output_file, args.input_prefix, outDir, species=args.species, skip_annotation=args.skip_cell_typing, reference_file=args.reference)
         end_time = time.time()
         elapsed_time = end_time - start_time
         print(f"Annotation took {int(elapsed_time // 60)} minutes and {elapsed_time % 60:.2f} seconds")
@@ -702,7 +710,7 @@ def main():
             if not os.path.exists(outDir):
                 os.makedirs(outDir)
 
-            print("Outputs written into " + outDir + "for annotation.")
+            print("Outputs written into " + outDir + " for annotation.")
 
             #if clustering is not run then read the adata object from the input file else use the adata object from clustering
             if not args.clustering:
@@ -719,7 +727,7 @@ def main():
             print("Annotation started for the sample " + args.input_prefix)
 
             start_time = time.time()
-            adata = astrid_annotation(adata, args.output_file, args.input_prefix, outDir, species=args.species, skip_annotation=args.skip_cell_typing)
+            adata = astrid_annotation(adata, args.output_file, args.input_prefix, outDir, species=args.species, skip_annotation=args.skip_cell_typing, reference_file=args.reference)
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Annotation took {int(elapsed_time // 60)} minutes and {elapsed_time % 60:.2f} seconds")
@@ -737,7 +745,7 @@ def main():
             if not os.path.exists(outDir):
                 os.makedirs(outDir)
 
-            print("Outputs written into " + outDir + "for validation.")
+            print("Outputs written into " + outDir + " for validation.")
 
             #if annotation is not run then read the adata object from the output file else use the adata object from annotation
             if not args.annotation:
