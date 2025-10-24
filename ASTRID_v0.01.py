@@ -20,10 +20,11 @@ plt.rcParams['pdf.fonttype']=42 #for vectorized text in pdfs
 sns.set_theme(style="white")
 
 
-def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
+def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None, plot = False):
 
     from multiprocessing import Pool
     from umap import UMAP
+    import anndata as ad
 
     # print message that clustering is running
     from scipy.sparse import csr_matrix
@@ -33,7 +34,7 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
     # check if there is a column in adata.obs that matches the authorType in adata.uns and if not give an error
     if adata.uns["authorType"] not in adata.obs.columns:
         raise ValueError("authorType is not in adata.obs. Please check the authorType in adata.uns")
-
+    
     # convert adata.X to sparse matrix if it is an array
     if type(adata.X) == np.ndarray:
         adata.X = csr_matrix(adata.X)
@@ -45,7 +46,10 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
     mapper = UMAP().fit(adata.obsm['X_pca_norm_counts'][:, 0:100])
     adata.obsm['X_umap'] = mapper.embedding_
 
-    plot_confusion_matrix(adata, "clustering_level_1", adata.uns["authorType"], outDir + input_prefix + "_" + "clustering_level_1_vs_" + adata.uns["authorType"] +"_confusion_matrix.pdf")
+    if plot:
+        plot_confusion_matrix(adata, "clustering_level_1", adata.uns["authorType"], outDir + input_prefix + "_" + "clustering_level_1_vs_" + adata.uns["authorType"] +"_confusion_matrix.pdf")
+
+    all_singlets = []
 
     # print that first level of clustering is done and also print the number of clusters identified and norm_mi between the author cell type column and clustering_level_1 using norm_mi from RefSTRATools
     print("First level of clustering done")
@@ -91,7 +95,11 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
     adata.obs = adata.obs.merge(level2_clustering, left_index=True, right_index=True, how='left')
     adata.obs.loc[adata.obs.clustering_level_1 == "unassigned", "clustering_level_2"] = "unassigned"
 
-    adata = adata[adata.obs["clustering_level_2"].str.contains("unassigned") == False]
+    # adata = adata[adata.obs["clustering_level_2"].str.contains("unassigned") == False]
+    singlets = adata[adata.obs["clustering_level_2"] == "unassigned"].copy()
+    assigned = adata[adata.obs["clustering_level_2"] != "unassigned"].copy()
+    all_singlets.append(singlets)
+    adata = assigned
 
     current_clustering_level = 3
 
@@ -102,8 +110,6 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
 
     while current_clustering_level < clustering_depth and adata.obs["clustering_level_" + str(current_clustering_level-2)].to_list() != adata.obs["clustering_level_" + str(current_clustering_level-1)].to_list():
         
-        # print(current_clustering_level)
-
         clusters = adata.obs["clustering_level_" + str(current_clustering_level - 1)].unique().tolist()
 
         clusters = sorted(clusters)
@@ -129,11 +135,25 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
 
         adata.obs = adata.obs.merge(level2_clustering, left_index=True, right_index=True, how='left')
         
-        adata = adata[adata.obs[new_key].str.contains("unassigned") == False]
+        # adata = adata[adata.obs[new_key].str.contains("unassigned") == False]
+        singlets = adata[adata.obs[new_key].str.contains("unassigned")].copy()
+        assigned = adata[~adata.obs[new_key].str.contains("unassigned")].copy()
+        all_singlets.append(singlets)
+        adata = assigned
 
         current_clustering_level = current_clustering_level + 1
 
+    clustering_cols = [col for col in adata.obs.columns if col.startswith("clustering_level_")]
+    for singlet in all_singlets:
+        for col in clustering_cols:
+            if col not in singlet.obs.columns:
+                singlet.obs[col] = "unassigned"
+    
     final_key = "clustering_level_" + str(current_clustering_level-1)
+    adata = ad.concat([adata] + all_singlets, uns_merge = "same")
+    adata.obs.loc[adata.obs[final_key].str.contains("unassigned"), final_key] = "unassigned"
+
+    del all_singlets
 
     # store the final clustering level in adata object inside uns
     adata.uns["final_clustering_level"] = final_key
@@ -141,7 +161,8 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
     # add a column to adata.obs called final_clustering_level and set it to the final_key column
     adata.obs["final_clustering_level"] = adata.obs[final_key]
     
-    plot_confusion_matrix(adata, final_key, adata.uns["authorType"], outDir + input_prefix + "_" +  final_key + "_vs_" + adata.uns["authorType"] + "_confusion_matrix.pdf")
+    if plot:
+        plot_confusion_matrix(adata, final_key, adata.uns["authorType"], outDir + input_prefix + "_" +  final_key + "_vs_" + adata.uns["authorType"] + "_confusion_matrix.pdf")
 
     # print that clustering is done and also print the final clustering level and number of clusters identified and some other information
     print("Clustering done")
@@ -151,7 +172,7 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None):
     
     return adata
 
-def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human", skip_annotation=False, reference_file=None):
+def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human", skip_annotation=False, reference_file=None, plot = False):
 
     from adpbulk import ADPBulk
 
@@ -202,8 +223,9 @@ def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human
 
         # merge only the columns SingleR_All_labels	SingleR_All_delta.next	SingleR_All_CellType from singleR_annotations to adata.obs on the index
         adata.obs = adata.obs.merge(singleR_result[['SingleR_Pruned_CellType', 'SingleR_All_deltanext', 'SingleR_CellType']], how="left", left_on=final_key, right_index=True)
-
-        plot_confusion_matrix(adata, "SingleR_CellType", adata.uns["authorType"], outDir + input_prefix + "_" +  "SingleR_CellType_vs_" + adata.uns["authorType"]+ "_confusion_matrix.pdf")
+    
+        if plot:
+            plot_confusion_matrix(adata, "SingleR_CellType", adata.uns["authorType"], outDir + input_prefix + "_" +  "SingleR_CellType_vs_" + adata.uns["authorType"]+ "_confusion_matrix.pdf")
 
     adata.write_h5ad(output_file)
 
@@ -214,7 +236,7 @@ def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human
     
     return adata
 
-def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clustering_results, skip_annotation=False):
+def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clustering_results, skip_annotation=False, plot = False):
 
     from scipy.cluster import hierarchy
     from scipy.spatial import distance
@@ -261,67 +283,68 @@ def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clu
         if type(marker_genes.loc[i, "marker_genes"]) == str:
             marker_genes_dict[marker_genes.loc[i, "cell_type"]] = marker_genes.loc[i, "marker_genes"].split(';')
 
-    temp_final_key = final_key
-    final_key = "SingleR_CellType"
+    if plot:
+        temp_final_key = final_key
+        final_key = "SingleR_CellType"
 
-    # adata.obs[final_key] = adata.obs[final_key].astype('category')
-    adata.obs[final_key] = adata.obs[final_key].astype('str')
-    if adata.n_obs > 1000:
-        sub_adata = sc.pp.subsample(adata, n_obs=1000, random_state=1, copy=True)
-    else:
-        sub_adata = adata.copy()
+        # adata.obs[final_key] = adata.obs[final_key].astype('category')
+        adata.obs[final_key] = adata.obs[final_key].astype('str')
+        if adata.n_obs > 1000:
+            sub_adata = sc.pp.subsample(adata, n_obs=1000, random_state=1, copy=True)
+        else:
+            sub_adata = adata.copy()
 
-    all_counts = pd.DataFrame(columns=marker_genes_list + [final_key])
+        all_counts = pd.DataFrame(columns=marker_genes_list + [final_key])
 
-    for cl2 in np.sort(sub_adata.obs[final_key].unique()):
-        # print(cl2)
-        tmp_counts = sc.get.obs_df(sub_adata[sub_adata.obs[final_key] == cl2], keys=marker_genes_list, layer="norm_counts")
-        tmp_counts.fillna(0, inplace=True)
+        for cl2 in np.sort(sub_adata.obs[final_key].unique()):
+            # print(cl2)
+            tmp_counts = sc.get.obs_df(sub_adata[sub_adata.obs[final_key] == cl2], keys=marker_genes_list, layer="norm_counts")
+            tmp_counts.fillna(0, inplace=True)
 
-        if(tmp_counts.shape[0] > 1):
-            row_linkage = hierarchy.linkage(distance.pdist(tmp_counts))
-            tmp_counts = tmp_counts.iloc[hierarchy.dendrogram(row_linkage,no_plot=True)['leaves'],:]
-        tmp_counts[final_key] = cl2
-        
-        all_counts = pd.concat([all_counts, tmp_counts], axis=0)
+            if(tmp_counts.shape[0] > 1):
+                row_linkage = hierarchy.linkage(distance.pdist(tmp_counts))
+                tmp_counts = tmp_counts.iloc[hierarchy.dendrogram(row_linkage,no_plot=True)['leaves'],:]
+            tmp_counts[final_key] = cl2
+            
+            all_counts = pd.concat([all_counts, tmp_counts], axis=0)
 
-    cs = Palette.load()
-    pal = StackPalette.load("spectral")  # Load a categorical palette, a full list can be found in the docs
-    grad = Grad(pal)  # Object to automatically "mix" the colors
+        cs = Palette.load()
+        pal = StackPalette.load("spectral")  # Load a categorical palette, a full list can be found in the docs
+        grad = Grad(pal)  # Object to automatically "mix" the colors
 
-    # Now to generate a dynamic list of colors based on the number of inputs:
-    # Get a bigger list by interpolating the colors if necessary
-    if len(all_counts[final_key].unique()) > len(pal):
-        colors = grad.n_colors(len(all_counts[final_key].unique())) 
-    else:
-        colors = pal.colors
+        # Now to generate a dynamic list of colors based on the number of inputs:
+        # Get a bigger list by interpolating the colors if necessary
+        if len(all_counts[final_key].unique()) > len(pal):
+            colors = grad.n_colors(len(all_counts[final_key].unique())) 
+        else:
+            colors = pal.colors
 
-    lut = dict(zip(all_counts[final_key].unique(), colors))
+        lut = dict(zip(all_counts[final_key].unique(), colors))
 
-    row_colors = all_counts[final_key].map(lut)
+        row_colors = all_counts[final_key].map(lut)
 
-    cm = sns.clustermap(all_counts.drop(columns=[final_key]), cmap="Blues", yticklabels=False, col_cluster=False, row_cluster=False, row_colors=row_colors, figsize=(10, 10))
-    cm.cax.set_visible(False)
-    cm.ax_row_dendrogram.set_visible(False)
-    cm.ax_col_dendrogram.set_visible(False)
-    borders = np.cumsum([0] + [sum(1 for i in cm) for k, cm in groupby(row_colors)])
-    for b0, b1, label in zip(borders[:-1], borders[1:], list(lut.keys())):
-        cm.ax_row_colors.text(-0.06, (b0 + b1) / 2, label, color='black', ha='right', va='center', rotation=0,
-                                transform=cm.ax_row_colors.get_yaxis_transform())
-    groups = all_counts[final_key]
-    for i, group in enumerate(groups):
-        if i > 0 and group.split("_")[0] != groups[i - 1].split("_")[0]:
-            cm.ax_heatmap.axhline(i, c="w", linewidth=6)
-            cm.ax_row_colors.axhline(i, c="w", linewidth=6)
-        elif i > 0 and group != groups[i - 1]:
-            cm.ax_heatmap.axhline(i, c="w", linewidth=3)
-            cm.ax_row_colors.axhline(i, c="w", linewidth=3)
+        cm = sns.clustermap(all_counts.drop(columns=[final_key]), cmap="Blues", yticklabels=False, col_cluster=False, row_cluster=False, row_colors=row_colors, figsize=(10, 10))
+        cm.cax.set_visible(False)
+        cm.ax_row_dendrogram.set_visible(False)
+        cm.ax_col_dendrogram.set_visible(False)
+        borders = np.cumsum([0] + [sum(1 for i in cm) for k, cm in groupby(row_colors)])
+        for b0, b1, label in zip(borders[:-1], borders[1:], list(lut.keys())):
+            cm.ax_row_colors.text(-0.06, (b0 + b1) / 2, label, color='black', ha='right', va='center', rotation=0,
+                                    transform=cm.ax_row_colors.get_yaxis_transform())
+        groups = all_counts[final_key]
+        for i, group in enumerate(groups):
+            if i > 0 and group.split("_")[0] != groups[i - 1].split("_")[0]:
+                cm.ax_heatmap.axhline(i, c="w", linewidth=6)
+                cm.ax_row_colors.axhline(i, c="w", linewidth=6)
+            elif i > 0 and group != groups[i - 1]:
+                cm.ax_heatmap.axhline(i, c="w", linewidth=3)
+                cm.ax_row_colors.axhline(i, c="w", linewidth=3)
 
-    plt.savefig(outDir + input_prefix + "_marker_genes_clustermap.pdf", bbox_inches='tight')
+        plt.savefig(outDir + input_prefix + "_marker_genes_clustermap.pdf", bbox_inches='tight')
 
-    final_key = temp_final_key
+        final_key = temp_final_key
 
-    del sub_adata, all_counts
+        del sub_adata, all_counts
 
     # for each of the clusters in clustering_level_2 of adata find the authorType abundance inside the clusters and report in a dataframe column seperated by commas with the cell_type(percentage%) format and only report cell types with abundnace more than 10%
     tableInterest = adata.obs.groupby([final_key, 'SingleR_CellType', adata.uns["authorType"]]).size().reset_index(name='counts')
@@ -582,6 +605,7 @@ def main():
     parser.add_argument('--validation', action='store_true', help='Run validation')
     parser.add_argument('--damage', action='store_true', help='Run cancer damage')
     parser.add_argument('--skip_cell_typing', action='store_true', help='Skip cell typing and assign "Undecided" to all cells')
+    parser.add_argument('--plot', action='store_true', help='Enable plotting (default: off)')
     parser.add_argument('--cutoff_level', type=int, default=None, help='Cut off clustering early at the specified level')
     parser.add_argument('--input_file', type=str, help='Input file path')
     parser.add_argument('--input_prefix', type=str, help='Input prefix')
@@ -618,10 +642,17 @@ def main():
 
         if args.author_type:
             adata.uns["authorType"] = args.author_type
+        else:
+            adata.obs["customAuthorType"]  = "NotAvailable"
+            adata.uns["authorType"] = "customAuthorType"
+            args.author_type = "customAuthorType"
+
 
         # check if the adata has authorType inside adata.uns and if not set it to cellTypeMinor
         if "authorType" not in adata.uns:
-            adata.uns["authorType"] = "cellTypeMinor"
+            adata.obs["customAuthorType"]  = "NotAvailable"
+            adata.uns["authorType"] = "customAuthorType"
+            args.author_type = "customAuthorType"
 
         start_time = time.time()
         adata = astrid_clustering(adata, args.input_prefix, outDir)
@@ -684,6 +715,11 @@ def main():
 
             if args.author_type:
                 adata.uns["authorType"] = args.author_type
+            else:
+                adata.obs["customAuthorType"]  = "NotAvailable"
+                adata.uns["authorType"] = "customAuthorType"
+                args.author_type = "customAuthorType"
+
 
             # check if the adata has authorType inside adata.uns and if not set it to cellTypeMinor
             if "authorType" not in adata.uns:
@@ -692,7 +728,7 @@ def main():
                 args.author_type = "customAuthorType"
 
             start_time = time.time()
-            adata = astrid_clustering(adata, args.input_prefix, outDir, cutoff_level=args.cutoff_level)
+            adata = astrid_clustering(adata, args.input_prefix, outDir, cutoff_level=args.cutoff_level, plot=args.plot)
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Clustering took {int(elapsed_time // 60)} minutes and {elapsed_time % 60:.2f} seconds")
