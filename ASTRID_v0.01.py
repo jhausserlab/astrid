@@ -408,6 +408,8 @@ def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clu
 
     clusters = adata.obs[final_key].astype(str).unique()
 
+    clusters = [cl for cl in clusters if cl != "unassigned"]
+
     # tableInterest.to_csv(outDir + input_prefix + "_tableInterest_df.csv", index=False)
 
     with Pool(processes=10) as pool:
@@ -432,6 +434,8 @@ def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clu
     unique_cell_types = marker_genes["cell_type"].unique()
 
     for cl2 in tableInterest[final_key].unique():
+        if cl2 == "unassigned":
+            continue
         tmpOR = odds_ratio_df[odds_ratio_df[final_key] == cl2]
         tmpOR_dict = dict(zip(tmpOR["gene"], (tmpOR["odds_ratio"] > 1) & (tmpOR["fold_change"] > 1)))
 
@@ -770,7 +774,7 @@ def main():
 
 
         if args.validation:
-            if not args.input_file or not args.output_file or not args.output_clustering_results or not args.input_prefix:
+            if not args.output_file or not args.output_clustering_results or not args.input_prefix:
                 raise ValueError("Missing required arguments for running validation")
             
             if args.out_dir:

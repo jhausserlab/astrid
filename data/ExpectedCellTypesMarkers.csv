@@ -1,5 +1,7 @@
 lineage,cell_type,marker_genes,expected_markers,cancer_or_host,comments
 cancer,cancer,,,cancer,
+cancer,breast cancer,ESR1;ERBB2;PGR,ESR1+ERBB2+PGR,cancer,
+cancer,crc,CEACAM6;CEACAM5;TSPAN8;SPINK1;S100A6;MMP7,CEACAM6+CEACAM5+TSPAN8+SPINK1+S100A6+MMP7,cancer,
 myeloid,macrophages,PTPRC;AIF1;CD68,PTPRC*AIF1*CD68,host,
 myeloid,dendritic,PTPRC;AIF1;XCR1;CLEC9A;FCER1A;CD1C;FSCN1;CCR7,PTPRC*AIF1*(XCR1+CLEC9A+FCER1A+CD1C+FSCN1+CCR7),host,
 myeloid,Eosinophils,PTPRC;AIF1;ADGRE1,PTPRC*AIF1*ADGRE1,host,
