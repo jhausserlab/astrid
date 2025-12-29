@@ -247,7 +247,9 @@ def clustering_recipe_custom(adata, k: int, resolution, do_highly_variable = Fal
     
     adata = normalize_data(adata)
     ndims_measured = max(2, np.floor(adata.n_obs/100).astype(int))
-
+    if np.floor(adata.n_obs/100).astype(int) > 100:
+        ndims_measured = 100
+        
     if do_highly_variable:
         bin_count = max(20, int(np.floor(adata.n_vars/1000)))
 
