@@ -78,7 +78,11 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None, plot = Fal
         if "log1p" in tmp_adata.uns:
             del tmp_adata.uns["log1p"]
 
-        tmp_adata = clustering_recipe_custom(tmp_adata, clustering_key="clustering_level_2", k =12, resolution=0.3, do_highly_variable = True)
+        k_step2 = 12
+        if tmp_adata.n_obs > 5000:
+            k_step2 = 30
+
+        tmp_adata = clustering_recipe_custom(tmp_adata, clustering_key="clustering_level_2", k = k_step2, resolution = 0.3, do_highly_variable = True)
 
         # add the level 1 cluster to the level 2 cluster
         tmp_adata.obs['clustering_level_2'] = str(cl1) + "_" + tmp_adata.obs['clustering_level_2']
