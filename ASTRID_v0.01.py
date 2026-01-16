@@ -240,7 +240,7 @@ def astrid_annotation(adata, output_file, input_prefix, outDir, species = "human
     
     return adata
 
-def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clustering_results, skip_annotation=False, plot = False):
+def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clustering_results, species = "human", skip_annotation=False, plot = False):
 
     from scipy.cluster import hierarchy
     from scipy.spatial import distance
@@ -269,7 +269,12 @@ def astrid_validation(adata, pseudobulk_matrix, input_prefix, outDir, output_clu
     # print message that validation is running
     print("Running validation")
 
-    marker_genes = pd.read_csv('data/ExpectedCellTypesMarkers.csv')
+    if species == "human":
+        marker_genes = pd.read_csv('data/ExpectedCellTypesMarkers.csv')
+    elif species == "mouse":
+        marker_genes = pd.read_csv('data/ExpectedCellTypesMarkersMouse.csv')
+    else:
+        raise ValueError(f"Marker formulas not found for {species} ASTRID. Open a issue on github for new species.")
 
     marker_genes_list = []
     for i in range(len(marker_genes)):
@@ -663,7 +668,7 @@ def main():
             args.author_type = "customAuthorType"
 
         start_time = time.time()
-        adata = astrid_clustering(adata, args.input_prefix, outDir)
+        adata = astrid_clustering(adata, args.input_prefix, outDir, cutoff_level=args.cutoff_level, plot = args.plot)
         end_time = time.time()
         elapsed_time = end_time - start_time
         print(f"Clustering took {int(elapsed_time // 60)} minutes and {elapsed_time % 60:.2f} seconds")
@@ -678,7 +683,7 @@ def main():
         pseudobulk_matrix = pd.read_csv(os.path.splitext(args.output_file)[0] + "_" + final_key + "_pseudobulk_matrix.csv", index_col=0)
 
         start_time = time.time()
-        tableInterest = astrid_validation(adata, pseudobulk_matrix, args.input_prefix, outDir, args.output_clustering_results)
+        tableInterest = astrid_validation(adata, pseudobulk_matrix, args.input_prefix, outDir, args.output_clustering_results, species=args.species, skip_annotation=args.skip_cell_typing, plot=args.plot)
         end_time = time.time()
         elapsed_time = end_time - start_time
         print(f"Validation took {int(elapsed_time // 60)} minutes and {elapsed_time % 60:.2f} seconds")
@@ -817,7 +822,7 @@ def main():
             pseudobulk_matrix.index = pseudobulk_matrix.index.astype(str)
             
             start_time = time.time()
-            tableInterest = astrid_validation(adata, pseudobulk_matrix, args.input_prefix, outDir, args.output_clustering_results, args.skip_cell_typing)
+            tableInterest = astrid_validation(adata, pseudobulk_matrix, args.input_prefix, outDir, args.output_clustering_results, species=args.species, skip_annotation=args.skip_cell_typing, plot = args.plot)
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Validation took {int(elapsed_time // 60)} minutes and {elapsed_time % 60:.2f} seconds")

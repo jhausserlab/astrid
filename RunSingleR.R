@@ -24,7 +24,7 @@ if (reference_file != "" && file.exists(reference_file)) {
     newRef <- newRef[,!(colnames(newRef) %in% excludeSamples$samples)]
   }
 } else if (species == "mouse") {
-  newRef <- readRDS("data/ASTRID_SingleR_Reference_mouse_20250811.Rds")
+  newRef <- readRDS("data/ASTRID_SingleR_Reference_mouse_20260116.Rds")
 } else {
   print("Invalid species entered!")
   return(0)
