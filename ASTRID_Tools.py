@@ -416,7 +416,8 @@ def process_cluster(params):
 
     new_key = "clustering_level_" + str(current_clustering_level)
 
-    if tmp_adata.n_obs < 13 or tmp_adata.n_obs < (n_obs / 1000):
+    # if tmp_adata.n_obs < 13 or tmp_adata.n_obs < (n_obs / 1000):
+    if tmp_adata.n_obs < max(13, int(np.ceil(n_obs / 1000))):
         tmp_adata.obs[new_key] = str(cl1)
     else:
         tmp_adata = clustering_recipe_custom(tmp_adata, clustering_key=new_key, k=12, resolution=0.3, do_highly_variable=True)
@@ -427,7 +428,11 @@ def process_cluster(params):
         if len(clustersFound) < 2:
             tmp_adata.obs.loc[tmp_adata.obs[new_key] != "unassigned", new_key] = str(cl1)
         else:
-            tmp_adata.obs[new_key] = str(cl1) + "_" + tmp_adata.obs[new_key]
+            # tmp_adata.obs[new_key] = str(cl1) + "_" + tmp_adata.obs[new_key]
+            labels = tmp_adata.obs[new_key].astype(str)
+            mask_un = labels == "unassigned"
+            labels.loc[~mask_un] = f"{cl1}_" + labels.loc[~mask_un]
+            tmp_adata.obs[new_key] = labels
 
     return tmp_adata.obs.loc[:, new_key]
 

@@ -79,7 +79,7 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None, plot = Fal
             del tmp_adata.uns["log1p"]
 
         k_step2 = 12
-        if tmp_adata.n_obs > 5000:
+        if tmp_adata.n_obs > 10000:
             k_step2 = 30
 
         tmp_adata = clustering_recipe_custom(tmp_adata, clustering_key="clustering_level_2", k = k_step2, resolution = 0.3, do_highly_variable = True)
@@ -138,8 +138,9 @@ def astrid_clustering(adata, input_prefix, outDir, cutoff_level=None, plot = Fal
         adata.obs = adata.obs.drop(columns=[col for col in adata.obs.columns if col.startswith(new_key)])
 
         adata.obs = adata.obs.merge(level2_clustering, left_index=True, right_index=True, how='left')
+        # adata.obs[new_key] = adata.obs[new_key].astype("string").fillna("unassigned")
         
-        # adata = adata[adata.obs[new_key].str.contains("unassigned") == False]
+        # # adata = adata[adata.obs[new_key].str.contains("unassigned") == False]
         singlets = adata[adata.obs[new_key].str.contains("unassigned")].copy()
         assigned = adata[~adata.obs[new_key].str.contains("unassigned")].copy()
         all_singlets.append(singlets)
