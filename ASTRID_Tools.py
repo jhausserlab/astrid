@@ -283,11 +283,13 @@ def clustering_recipe_custom(adata, k: int, resolution, do_highly_variable = Fal
 def runSingleR(adata_file, output_file, species = "human", rscript_path = '/scratch/alper.eroglu/miniconda3/envs/r4/bin/Rscript', reference_file = ""):
 
     print('Running SingleR ...')
-    if(reference_file == ""):
-        os.system('nice -19 ' + rscript_path + ' /scratch/alper.eroglu/tools/ASTRID/RunSingleR.R '+adata_file + ' ' + output_file + ' ' + species)
+    singleR_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "RunSingleR.R")
+
+    if reference_file == "":
+        os.system('nice -19 ' + rscript_path + ' ' + singleR_script + ' ' + adata_file + ' ' + output_file + ' ' + species)
     else:
         print("\t... with reference: " + reference_file)
-        os.system('nice -19 ' + rscript_path + ' /scratch/alper.eroglu/tools/ASTRID/RunSingleR.R '+adata_file + ' ' + output_file + ' ' + species + ' ' + reference_file)
+        os.system('nice -19 ' + rscript_path + ' ' + singleR_script + ' ' + adata_file + ' ' + output_file + ' ' + species + ' ' + reference_file)
     result=pd.read_csv(output_file)
 
     print('SingleR completed.')
